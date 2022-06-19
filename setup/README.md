@@ -13,7 +13,7 @@ If you already have Docker installed on your workstation, this is the recommende
 
 If you don't have Docker installed, it is easier to get started by installing and running it locally. The only dependency required is a Java virtual machine.
 
-Keycloak can also be easily deployed to Kubernetes, where you have the option of using the Keycloak Kubernetes Operator, which makes installation, configuration, and management even simpler. We are not going to provide instructions for Kubernetes in this training, as we instead want to focus on Keycloak and its features. If you are interested in knowing how to run Keycloak on Kubernetes, then the Keycloak website provides great Getting started guides at https://www.keycloak.org/getting-started.
+Keycloak can also be easily deployed to Kubernetes, where you have the option of using the Keycloak Kubernetes Operator, which makes installation, configuration, and management even simpler. We are not going to provide instructions for Kubernetes in this training, as we instead want to focus on Keycloak and its features. If you are interested in knowing how to run Keycloak on Kubernetes, then the Keycloak website provides great Getting started guides at https://www.keycloak.org/getting-started/getting-started-kube.
 
 In the next section, we will look at how you can run Keycloak as a container on Docker. If you prefer to run it locally, you can skip to the section titled Installing and running Keycloak with OpenJDK.
 
@@ -24,8 +24,15 @@ With Docker, it is very easy to run Keycloak as you don't need to install a Java
 To run Keycloak on Docker, simply execute the following command:
 
 ```
-$ docker run -e KEYCLOAK_USER=admin -e KEYCLOAK_PASSWORD=admin -p 8080:8080 quay.io/keycloak/keycloak
+$ docker run --name keycloak -p 8080:8080  \
+    -e KEYCLOAK_ADMIN=admin -e KEYCLOAK_ADMIN_PASSWORD=admin \
+    quay.io/keycloak/keycloak-x \
+    start-dev
 ```
+
+As expected, the container will run in development mode.
+
+In this mode, some key configuration options are set to make it possible to start the server for development purposes without the burden of having to define additional settings that are mandatory for production.
 
 As Keycloak does not ship with a default admin account, passing the environment variables, KEYCLOAK_USER and KEYCLOAK_PASSWORD, makes it easy to create an initial admin account. We are also using –p 8080 to publish the port used by Keycloak to the host, so as to make it easy to access Keycloak.
 
@@ -82,18 +89,16 @@ Keycloak does not ship with a default admin account. This is to prevent anyone f
 
 This means that prior to using Keycloak, you need to create an initial admin account.
 
-To create an admin account on Linux or macOS, execute the following command in a terminal:
+To create an admin account on Linux or macOS, execute the following command in a terminal to set the username and password for this account:
 
 ```
-$ cd $KC_HOME
-$ bin/add-user-keycloak.sh -u admin -p admin
+$ export KEYCLOAK_ADMIN=admin; export KEYCLOAK_ADMIN_PASSWORD=change_me
 ```
 
 On Windows, execute the following command:
 
 ```
-> cd %KC_HOME%
-> bin\add-user-keycloak.bat -u admin -p admin
+> set KEYCLOAK_ADMIN=admin; set KEYCLOAK_ADMIN_PASSWORD=change_me
 ```
 
 ***Important note :*** For production systems, you should obviously use a more secure password, including strongly considering using strong authentication, especially for the admin account. Later in the training, we will cover how you can easily enable two-factor authentication with Keycloak.
@@ -101,20 +106,21 @@ On Windows, execute the following command:
 You are now ready to start Keycloak, which we will cover next.
 
 ### Starting Keycloak
-Once you have installed Keycloak and created the initial admin account, it's easy to start Keycloak.
+
+Once you launch Keycloak, it will automatically create your admin account based on the values definded in the environment variables :
 
 On Linux or macOS, start Keycloak with the following command:
 
 ```
 $ cd $KC_HOME
-$ bin/standalone.sh
+$ bin/kc.sh start-dev
 ```
 
 Or, on Windows, execute the following command:
 
 ```
 > cd %KC_HOME%
-> bin\standalone.bat
+> bin\kc.bat start-dev
 ```
 
 After a few seconds, you will see a message that confirms that Keycloak has started successfully

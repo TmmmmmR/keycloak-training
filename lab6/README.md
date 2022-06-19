@@ -189,42 +189,29 @@ You can easily spin up a Postgresql database using thid docker command :
 $ docker run --name postgresql-container -p 5432:5432 -e POSTGRES_DB='<DB_NAME>' -e POSTGRES_USER='<USERNAME>' -e POSTGRES_PASSWORD='<PASSWORD>' -d quay.io/bitnami/postgresql
 ```
 
-We are going to perform all the preceding steps using the following script available at [setup-keycloak/configure-database.cli](./setup-keycloak/configure-database.cli):
+To configure Keycloak to use PostgreSQL you issue the following command:
 
 ```
-embed-server --server-config=standalone-ha.xml --std-out=discard
-module add --name=org.postgres --resources=<PATH_TO_JDBC_DRIVER_JAR> --dependencies=javax.api,javax.transaction.api
-/subsystem=datasources/jdbc-driver=postgres:add(driver-name=postgres, driver-module-name=org.postgres, xa-datasource-class=org.postgresql.xa.PGXADataSource)
-/subsystem=datasources/data-source=KeycloakDS:write-attribute(name=connection-url,value=<JDBC_URL>)
-/subsystem=datasources/data-source=KeycloakDS:write-attribute(name=driver-name, value=postgres)
-/subsystem=datasources/data-source=KeycloakDS:write-attribute(name=user-name, value=<USERNAME>)
-/subsystem=datasources/data-source=KeycloakDS:write-attribute(name=password,value=<PASSWORD>)
-stop-embedded-server
+$ bin/kc.sh build --db postgres
 ```
 
-In this file, you should replace the following references with their real values:
+Here we assume that a PostgreSQL database named keycloak has already been created with a corresponding role named keycloak and a password with the same value.
 
-- **PATH_TO_JDBC_DRIVER_JAR** should be replaced with the absolute path where the JDBC driver JAR file is located.
-- **JDBC_URL** should be replaced with the URL that should be used to connect to the database. For instance, jdbc:postgresql://mypostgresql/keycloak.
-- **USERNAME** should be replaced with the username that will be used to connect to the database.
-- **PASSWORD** should be replaced with the password of the user connecting to the database.
+So you have to add the following database connection options to the start command:
 
-Then run the **jboss-cli.sh** tool to apply the configuration:
+`–db-url-host=127.0.0.1` : the database hostname or IP address
+`–db-url-database=keycloak` : the name of the database to use
+`–db-username=keycloak` : the user authorized to connect to the database
+`–db-password=keycloak` : the corresponding password for the user
 
-```
-$ cd $KC_HOME
-$ bin/jboss-cli.sh --file=./setup-keycloak//configure-database.cli
-```
-
-If everything is OK, the next time you start the server you should connect to the database you have configured.
 
 In addition to these basic settings to connect to an external database, there are other settings you should consider before going to production. Probably one of the most important ones, the size of the connection pool should be sized according to the load you expect in your system, and how many concurrent requests should be allowed at a given point in time.
 
 By default, the pool is configured with a max of 20 connections. This value should be enough for most deployments, but if you are facing errors in logs due to connections not available in the pool when under an unexpected load, you may change the pool size by running the following CLI command:
 
 ```
-/subsystem=datasources/data-source=KeycloakDS:write-attribute(name=max-pool-size, value=30)
-/subsystem=datasources/data-source=KeycloakDS:write-attribute(name=min-pool-size, value=30)
+db.pool.min-size=30
+db.pool.max-size=30
 ```
 
 In the preceding example, we are increasing the pool size to a maximum (max-pool-size) of 30 connections. We are also defining the minimum size (min-pool-size) with the same value. The reason for that is that creating new connections is expensive and keeping a minimum value of 30 connections helps to make sure connections are always available during the server's lifetime.
