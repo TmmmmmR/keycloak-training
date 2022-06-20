@@ -2,7 +2,7 @@ var express = require('express');
 var app = express();
 var stringReplace = require('string-replace-middleware');
 
-var KC_URL = process.env.KC_URL || "http://localhost:8180/auth";
+var KC_URL = process.env.KC_URL || "http://localhost:8080/";
 var SERVICE_URL = process.env.SERVICE_URL || "http://localhost:4000/secured";
 
 app.use(stringReplace({

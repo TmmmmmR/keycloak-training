@@ -16,18 +16,9 @@ If you are using Linux, you should be able to do that by changing your /etc/host
 
 ```
 
-We are also going to need to run some CLI scripts to configure the server. For that, we are going to run the **jboss-cli.sh** script. This script is located in the bin directory of the Keycloak installation and can be executed as follows:
+Lastly, we are going to use HAProxy as a reverse proxy in front of multiple Keycloak instances. 
 
-```
-$ cd $KC_HOME
-$ bin/jboss-cli.sh
-```
-
-Lastly, we are going to use HAProxy as a reverse proxy in front of multiple Keycloak instances. If you are using CentOS or Fedora Linux, you should be able to install HAProxy as follows:
-
-```
-$ sudo dnf -y install haproxy
-```
+We are going to use docker containers to install and configure all components, but all relevant parameters will be explained and they apply to all environments, whether it is containerized, on-premise, GitOps, or Ansible.
 
 ## Setting the hostname for Keycloak
 
@@ -40,6 +31,7 @@ Keycloak exposes different endpoints to talk with applications as well as to all
 The base URL for each group has an important impact on how tokens are issued and validated, on how links are created for actions that require the user to be redirected to Keycloak (for example, when resetting passwords through email links), and, most importantly, how applications will discover these endpoints when fetching the OpenID Connect Discovery document from **/auth/realms/{realm-name}/.well-known/openid-configuration**.
 
 In the next steps, we will be looking into each of these groups, how to define a base URL for each one, and the impact it has on users and applications using Keycloak.
+
 
 ### Setting the frontend URL
 
@@ -62,24 +54,15 @@ Last but not least, without a frontend URL set, all the benefits you will get fr
 
 The expected behavior, however, is that regardless of the node processing the request, the base URL should be the same and aligned with the public domain name where Keycloak is being exposed. By doing that, instances are going to work as if they were one so that users and applications can benefit from all the improvements we will cover later to the general availability, performance, scalability, and failover aspects of Keycloak.
 
-Let's set a frontend URL by running the following CLI script available from the folder located at [setup-keycloak/configure-hostname.cli](./setup-keycloak/configure-hostname.cli) :
+To set the hostname part of the frontend base URL, enter this command:
 
 ```
-embed-server --server-config=standalone-ha.xml --std-out=discard
-/subsystem=keycloak-server/spi=hostname/provider=default:write-attribute(name=properties.frontendUrl,value=https://mykeycloak/auth)
-stop-embedded-server
+bin/kc.[sh|bat] start --hostname=<value>
 ```
 
-To run the script execute the following command:
+By setting this property, you are explicitly saying that any Keycloak instance should advertise its endpoints and issue tokens using the **https://mykeycloak/** base URL.
 
-```
-$ cd $KC_HOME
-$ bin/jboss-cli.sh --file=./setup-keycloak/configure-hostname.cli
-```
-
-By setting the **frontendUrl** property, as shown previously, you are explicitly saying that any Keycloak instance should advertise its endpoints and issue tokens using the **https://mykeycloak/auth** base URL.
-
-In this section, you learned that setting **frontendUrl** allows you to define the base URL where Keycloak is publicly accessible. You also learned that setting this configuration is crucial to group all instances of Keycloak under a single and logical domain and issuer.
+In this section, you learned that setting **hostname-frontend-url** allows you to define the base URL where Keycloak is publicly accessible. You also learned that setting this configuration is crucial to group all instances of Keycloak under a single and logical domain and issuer.
 
 In the next step, we will be looking at how to configure the URL for backend endpoints.
 
@@ -99,10 +82,10 @@ By default, the backend base URL is also calculated based on the request URL. Us
 If you look at the [setup-keycloak/configure-hostname.cli](./setup-keycloak/configure-hostname.cli) file, you should see the following configuration:
 
 ```
-/subsystem=keycloak-server/spi=hostname/provider=default:write-attribute(name=properties.forceBackendUrlToFrontendUrl, value=true)
+bin/kc.[sh|bat] start --hostname=<value> --hostname-strict-backchannel=true
 ```
 
-When the **forceBackendUrlToFrontendUrl** property is set, Keycloak will advertise backend endpoints using whatever you defined as a frontend URL, thus giving applications an accessible URL and not something else based on the internal hostname used by Keycloak.
+When all applications connected to Keycloak communicate through the public URL, set **hostname-strict-backchannel** to true. Otherwise, leave this parameter as false to allow internal applications to communicate with Keycloak through an internal URL.
 
 In the next step, you will learn how to set the base URL for the administration endpoints.
 
@@ -110,9 +93,13 @@ In the next step, you will learn how to set the base URL for the administration 
 
 You usually do not want to make the Keycloak Administration Console publicly available. For that, you can set the adminUrl property to force Keycloak to use a specific, private URL:
 
-By setting the **adminUrl** property, any URL used by the Admin Console will be based on the value you provided. That said, links and static resources used to render the console will only be accessible using the URL you defined.
+```
+bin/kc.[sh|bat] start --hostname=mykeycloak --hostname-admin=myadminurl
+```
 
-Although it makes it difficult to access the console from a network that cannot resolve the domain name or reach the server, you still want to enforce specific rules in your reverse proxy so that the /auth/admin path is fully protected.
+By setting the **hostname-admin** property, any URL used by the Admin Console will be based on the value you provided. That said, links and static resources used to render the console will only be accessible using the URL you defined.
+
+Although it makes it difficult to access the console from a network that cannot resolve the domain name or reach the server, you still want to enforce specific rules in your reverse proxy so that the /admin path is fully protected.
 
 In the next step, we will be looking at how to enable TLS so that Keycloak is only accessible through a secure channel.
 
@@ -120,39 +107,42 @@ In the next step, we will be looking at how to enable TLS so that Keycloak is on
 
 Any request to and from Keycloak should be done through a secure channel. For that, you must enable HTTP over TLS, also known as HTTPS. In a nutshell, you should never expose Keycloak endpoints through HTTP.
 
+To achieve this, we have 2 options :
+
+### Option 1 : Providing a Java Keystore
+
 The first step to enable HTTPS is to create or reuse a Java KeyStore where the server's private key and certificates are stored. If you are planning to deploy Keycloak in production, you probably have all the key material to enable TLS, as well as your certificates signed by a trusted Certificate Authority (CA).
 
-The next step is to configure the HTTPS listener to use the key material from your Java KeyStore. For that, look at the following script available book at [setup-keycloak/configure-https.cli](./setup-keycloak/configure-https.cli) :
+The next step is to configure the HTTPS listener to use the key material from your Java KeyStore. For that, the following setting can be used :
 
 ```
-embed-server --server-config=standalone-ha.xml --std-out=discard
-/subsystem=elytron/key-store=kcKeyStore:add(path=${jboss.home.dir}/setup-keycloak/mykeycloak.keystore,type=JKS,credential-reference={clear-text=password})
-/subsystem=elytron/key-manager=kcKeyManager:add(key-store=kcKeyStore,credential-reference={clear-text=password})
-/subsystem=elytron/server-ssl-context=kcSSLContext:add(key-manager=kcKeyManager)
-batch
-/subsystem=undertow/server=default-server/https-listener=https:undefine-attribute(name=security-realm)
-/subsystem=undertow/server=default-server/https-listener=https:write-attribute(name=ssl-context,value=kcSSLContext)
-run-batch
-stop-embedded-server
+bin/kc.[sh|bat] start --https-key-store-file=/path/to/existing-keystore-file
 ```
+
+You can also set a secure password for your keystore using the https-key-store-password option:
+
+```
+bin/kc.[sh|bat] start --https-key-store-password=<value>
+```
+
+If no password is set, the default password **password** is used.
 
 In this file, we are using a Java KeyStore available in the setup folder [setup-keycloak/mykeycloak.keystore](./setup-keycloak/mykeycloak.keystore). This KeyStore was built for example purposes using a self-signed certificate and you should not use it in production. Instead, you should replace it with a KeyStore using your own private key and certificate.
 
-Then run the jboss-cli.sh tool to apply the configuration:
+
+### Option 2 : Providing certificates in PEM format
+
+As an alternative, we can use a pair of matching certificate and private key files in PEM format, you configure Keycloak to use them by running the following command:
 
 ```
-$ cd $KC_HOME
-$ bin/jboss-cli.sh --file=./setup-keycloak/configure-https.cli
+bin/kc.[sh|bat] start --https-certificate-file=/path/to/certfile.pem --https-certificate-key-file=/path/to/keyfile.pem
 ```
 
-Now, let's start Keycloak by running the following command:
-
-```
-$ cd $KC_HOME
-bin/standalone.sh -c standalone-ha.xml
-```
+Keycloak creates a keystore out of these files in memory and uses this keystore afterwards.
 
 If everything is OK, you should be able to access Keycloak at https://localhost:8443, and you should be able to see that the certificate being used comes from your Java KeyStore.
+
+### Bonus : Enforcing HTTPS on a per-realm basis
 
 In addition to enabling HTTPS, Keycloak also allows you to define TLS constraints on a per-realm basis. Basically, for each realm, you can set whether Keycloak should require HTTPS for incoming requests:
 
@@ -183,21 +173,13 @@ To configure a database, a few steps are needed:
 - Configuring the JDBC driver so that it can be used by Keycloak
 - Configuring Keycloak to connect to the database using a valid URL, username, and password
 
-You can easily spin up a Postgresql database using thid docker command :
-
-```
-$ docker run --name postgresql-container -p 5432:5432 -e POSTGRES_DB='<DB_NAME>' -e POSTGRES_USER='<USERNAME>' -e POSTGRES_PASSWORD='<PASSWORD>' -d quay.io/bitnami/postgresql
-```
-
 To configure Keycloak to use PostgreSQL you issue the following command:
 
 ```
 $ bin/kc.sh build --db postgres
 ```
 
-Here we assume that a PostgreSQL database named keycloak has already been created with a corresponding role named keycloak and a password with the same value.
-
-So you have to add the following database connection options to the start command:
+Then, you have to add the following database connection options to the start command:
 
 `–db-url-host=127.0.0.1` : the database hostname or IP address
 `–db-url-database=keycloak` : the name of the database to use
@@ -229,45 +211,11 @@ To enable clustering and full high availability, you should do the following:
 - Run the server using a high-availability configuration profile.
 - Make sure the reverse proxy is configured to distribute load across the different instances.
 
-Let's start by understanding the different configuration profiles that Keycloak provides. Consider that you run the server as follows:
 
-```
-$ cd $KC_HOME
-$ bin/standalone.sh
-```
+For this lab, we are going to use the cache configuration provided under ()[] which use an external infispac storage system and JDBC_PING as a discovery protocol
 
-Keycloak is going to run using a specific configuration profile defined in the $KC_HOME/standalone/conf/standalone.xml file. The standalone.xml file is a configuration profile that is targeted for running a single Keycloak instance. Useful for testing and development purposes, but not for production.
+Bellow are some relevant parameters :
 
-On the other hand, there is an additional configuration profile defined in the $KC_HOME/standalone/conf/standalone-ha.xml file. This file is targeted for running Keycloak for high availability, where clustering is enabled by default.
-
-To run multiple Keycloak instances and build a cluster, you basically need to run the server as follows:
-
-```
-$ cd $KC_HOME
-$ bin/standalone.sh -c standalone-ha.xml -Djboss.node.name=kc1
-```
-
-This command will start the first instance in our cluster. The server will be listening on the default ports and you should be able to access it at http://localhost:8443.
-
-Let's now start a second instance by specifying a different port offset using the jboss.socket.binding.port-offset system property. This property is going to allow us to run the second instance within the same host without conflicting with the first instance that is listening on the default ports. This is achieved by increasing by 100 the number of each port used by Keycloak so that instead of listening on the default HTTPS 8443 port, the server will be available at http://localhost:8543/auth:
-
-```
-$ cd $KC_HOME
-$ bin/standalone.sh -Djboss.socket.binding.port-offset=100 -c standalone-ha.xml -Djboss.node.name=kc2
-```
-
-Now, perform the same steps to start the third node as follows:
-
-```
-$ cd $KC_HOME
-$ bin/standalone.sh -Djboss.socket.binding.port-offset=200 -c standalone-ha.xml -Djboss.node.name=kc3
-```
-
-After executing this last command, you should now have three Keycloak instances running on ports 8443, 8543, and 8643, respectively.
-
-**Note**: In production, you do not need to use the jboss.socket.binding.port-offset system property because instances will run either on different hosts or, if using containers, in separate containers.
-
-By looking at the $KC_HOME/standalone/configuration/standalone-ha.xml file, you should see the following cache definitions:
 
 ```xml
 <distributed-cache name="sessions" owners="1"/>
@@ -281,12 +229,7 @@ By looking at the $KC_HOME/standalone/configuration/standalone-ha.xml file, you 
 
 Depending on your availability and failover requirements, you might want to increase the number of owners – the nodes where state is replicated – to at least 2 so that state is replicated to 2 nodes in the cluster. By increasing the number of owners, Keycloak can survive up to 1 node failure without losing any state.
 
-Let's change the number of owners for each of those caches by running the [setup-keycloak/configure-caches.cli](./setup-keycloak/configure-caches.cli):
-
-```
-$ cd $KC_HOME
-$ bin/jboss-cli.sh --file=./setup-keycloak/configure-caches.cli
-```
+To find out more about using multiple nodes, the different caches and an appropriate stack for your environment, see the [Configuring distributed caches](https://www.keycloak.org/server/caching) guide.
 
 ## Configuring a reverse proxy
 
@@ -301,13 +244,7 @@ Regardless of your preference, there is a set of basic requirements that you sho
 
 Some of these requirements are intrinsic to the concept of a reverse proxy and are supported by the different implementations.
 
-Before moving on to the next step, make sure to update your HAProxy installation with the haproxy.cfg file available at [setup-keycloak/haproxy.cfg](./setup-keycloak/haproxy.cfg):
-
-```
-$ cd $KC_HOME
-$ sudo cp setup-keycloak/haproxy.cfg /etc/haproxy/haproxy.cfg
-$ sudo cp setup-keycloak/haproxy.crt.pem /etc/haproxy
-```
+For this lab, we are going to use the haproxy.cfg file available at [setup-keycloak/haproxy/haproxy.cfg](./setup-keycloak/haproxy.cfg).
 
 In the next steps, we will be looking at each of the requirements mentioned herein and how to address them using HAProxy.
 
@@ -332,22 +269,13 @@ To overcome this limitation, reverse proxies should be able to forward specific 
 - **X-Forward-Proto**: A header indicating the protocol (for example, HTTPS) that the client is using to communicate with the proxy
 - **Host**: A header indicating the host and port number of the proxyTipSpecial care should be taken when making sure the proxy is setting all these headers properly, and not just forwarding these headers to Keycloak if they are sent by clients.
 
-On Keycloak, the configuration you need to integrate with a proxy is quite simple. Basically, you need to tell Keycloak that it should infer client and request information based on the headers we just discussed. For that, look at the configure-proxy.cli file available at  [setup-keycloak/configure-proxy.cli](./setup-keycloak/configure-proxy.cli):
+On Keycloak, the configuration you need to integrate with a proxy is quite simple. Basically, you need to enable the proxy mode by using the following command:
 
 ```
-embed-server --server-config=standalone-ha.xml --std-out=discard
-/subsystem=undertow/server=default-server/https-listener=https: write-attribute(name=proxy-address-forwarding, value=true)
-stop-embedded-server
+bin/kc.[sh|bat] start --proxy <mode>
 ```
 
-Then run the jboss-cli.sh tool to apply the configuration:
-
-```
-$ cd $KC_HOME
-$ bin/jboss-cli.sh --file=./Keycloak-Identity-and-Access-Management-for-Modern-Applications/ch9/configure-proxy.cli
-```
-
-After running the preceding CLI command, Keycloak is ready to respect the information provided by the proxy through the mentioned headers.
+We are going to select the **reencrypt** mode in order to encrypt the communication between the reverse proxy and Keycloak.
 
 On the reverse proxy side, we have the following configuration defined:
 
@@ -365,25 +293,15 @@ Another important configuration you should consider is how the proxy is going to
 
 As you learned in the Enabling clustering section, Keycloak tracks state about user and client interactions with the server. This state is kept in in-memory caches and shared across different nodes in the cluster. Session affinity helps to minimize the time taken by Keycloak to look up data on these caches, where clients connecting to these nodes do not need to look up data on other nodes in the cluster.
 
-To configure session affinity, look at the configure-session-affinity.cli file available at [setup-keycloak/configure-session-affinity.cli](./setup-keycloak/configure-session-affinity.cli) :
+To configure session affinity, Keycloak.X provides the following setting :
+ 
 
-```
-embed-server --server-config=standalone-ha.xml --std-out=discard
-/subsystem=keycloak-server/spi=stickySessionEncoder:add
-/subsystem=keycloak-server/spi=stickySessionEncoder/provider=infinispan:add(enabled=true, properties={shouldAttachRoute=false})
-stop-embedded-server
-```
+- ```spi-sticky-session-encoder-infinispan-should-attach-route``` : If the route should be attached to cookies to reflect the node that owns a particular session.
 
-Then run the jboss-cli.sh tool to apply the configuration:
-
-```
-$ cd $KC_HOME
-$ bin/jboss-cli.sh --file=./setup-keycloak/configure-session-affinity.cli
-```
-
-By doing that, Keycloak is going to rely on the proxy to keep session affinity between clients and backend nodes.
+When it's enable (by default), Keycloak is going to rely on the proxy to keep session affinity between clients and backend nodes.
 
 Now, on the reverse proxy side, we have the following configuration to guarantee that clients are tied to a specific node:
+
 
 ```
 cookie KC_ROUTE insert indirect nocache
@@ -391,15 +309,82 @@ cookie KC_ROUTE insert indirect nocache
 
 With the preceding configuration, HAProxy is going to set a **KC_ROUTE** cookie where its value is the first node that the client made the request to. Subsequent requests from the same client will always be served by the same node.
 
+
+## Putting it all together!
+
+First, we start by building all relevant containers with the parameters explained in the previous sections :
+
+- Navigate to keycloak folder and then run the following command :
+
+```
+docker build -t keycloak-clustered .
+```
+
+- Navigate to keycloak folder and then run the following command :
+
+```
+docker build -t haproxy-reverse-proxy .
+```
+
+Open a terminal and create a Docker network
+
+```
+$ docker network create keycloak-net
+```
+
+Open another terminal and run keycloak-clustered-1 Docker container
+
+```
+$ docker run --rm --name keycloak-clustered-1 -p 8080:8080 \
+  -e KEYCLOAK_ADMIN=admin \
+  -e KEYCLOAK_ADMIN_PASSWORD=admin \
+  -e KC_DB=mysql \
+  -e KC_DB_URL_HOST=mysql \
+  -e KC_DB_URL_DATABASE=keycloak \
+  -e KC_DB_USERNAME=keycloak \
+  -e KC_DB_PASSWORD=password \
+  -e KC_LOG_LEVEL=INFO,org.infinispan:DEBUG,org.jgroups:DEBUG \
+  -e JGROUPS_DISCOVERY_EXTERNAL_IP=keycloak-clustered-1 \
+  --network keycloak-net \
+  keycloak-clustered:latest start-dev
+```
+
+Open another terminal and run keycloak-clustered-2 Docker container
+
+```
+$ docker run --rm --name keycloak-clustered-2 -p 8081:8080 \
+  -e KEYCLOAK_ADMIN=admin \
+  -e KEYCLOAK_ADMIN_PASSWORD=admin \
+  -e KC_DB=mysql \
+  -e KC_DB_URL_HOST=mysql \
+  -e KC_DB_URL_DATABASE=keycloak \
+  -e KC_DB_USERNAME=keycloak \
+  -e KC_DB_PASSWORD=password \
+  -e KC_LOG_LEVEL=INFO,org.infinispan:DEBUG,org.jgroups:DEBUG \
+  -e JGROUPS_DISCOVERY_EXTERNAL_IP=keycloak-clustered-2 \
+  --network keycloak-net \
+  keycloak-clustered:latest start-dev
+```
+
+Open another terminal and run keycloak-clustered-3 Docker container
+
+```
+$ docker run --rm --name keycloak-clustered-3 -p 8081:8080 \
+  -e KEYCLOAK_ADMIN=admin \
+  -e KEYCLOAK_ADMIN_PASSWORD=admin \
+  -e KC_DB=mysql \
+  -e KC_DB_URL_HOST=mysql \
+  -e KC_DB_URL_DATABASE=keycloak \
+  -e KC_DB_USERNAME=keycloak \
+  -e KC_DB_PASSWORD=password \
+  -e KC_LOG_LEVEL=INFO,org.infinispan:DEBUG,org.jgroups:DEBUG \
+  -e JGROUPS_DISCOVERY_EXTERNAL_IP=keycloak-clustered-3 \
+  --network keycloak-net \
+  keycloak-clustered:latest start-dev
+```
+
+
 ## Testing your environment
-
-### Reload HAProxy config
-
-Before testing, make sure HAProxy is started by running the following command:
-
-```
-$ sudo systemctl restart haproxy
-```
 
 ### Testing load balancing and failover
 

@@ -54,8 +54,10 @@ Now, let's use this theme when authenticating to the account console. For that, 
 ```
 $ cd lab11/themes/mytheme
 $ ./mvnw clean package
-$ cp target/mytheme.jar $KC_HOME/standalone/deployments
+$ cp target/mytheme.jar $KC_HOME/providers
 ```
+
+If Keycloak was started with ```--auto-build``` it will automaticlly install your new provider, otherwise you need to restart your keycloak instance.
 
 After performing these steps, log in to the administration console as the administrator user. Once you are in the console, select the **account-console** client from the list of clients and then, at the client details page, select the **mytheme** theme from the list of options for the **Login Theme** setting. At the end, the **account-console** client settings should look as follows:
 
