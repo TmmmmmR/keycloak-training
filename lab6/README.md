@@ -16,9 +16,13 @@ If you are using Linux, you should be able to do that by changing your /etc/host
 
 ```
 
-Lastly, we are going to use HAProxy as a reverse proxy in front of multiple Keycloak instances. 
+Lastly, we are going to use HAProxy as a reverse proxy in front of multiple Keycloak instances. If you are using CentOS or Fedora Linux, you should be able to install HAProxy as follows:
 
-We are going to use docker containers to install and configure all components, but all relevant parameters will be explained and they apply to all environments, whether it is containerized, on-premise, GitOps, or Ansible.
+```
+$ sudo dnf -y install haproxy
+```
+
+All relevant parameters will be explained and they apply to all environments, whether it is containerized, on-premise, GitOps, or Ansible.
 
 ## Setting the hostname for Keycloak
 
@@ -211,11 +215,36 @@ To enable clustering and full high availability, you should do the following:
 - Run the server using a high-availability configuration profile.
 - Make sure the reverse proxy is configured to distribute load across the different instances.
 
+To run multiple Keycloak instances and build a cluster, you basically need to run the server as follows:
 
-For this lab, we are going to use the cache configuration provided under ()[] which use an external infispac storage system and JDBC_PING as a discovery protocol
+```
+$ cd $KC_HOME
+$ bin/kc.sh start --https-certificate-file=./tls/mykeycloak+1.pem --https-certificate-key-file=./tls/mykeycloak+1-key.pem --hostname=mykeycloak:8443 --hostname-strict-backchannel=true
+```
 
-Bellow are some relevant parameters :
+This command will start the first instance in our cluster. The server will be listening on the default ports and you should be able to access it at http://localhost:8443.
 
+Let's now start a second instance by specifying a different port offset using the jboss.socket.binding.port-offset system property. This property is going to allow us to run the second instance within the same host without conflicting with the first instance that is listening on the default ports. This is achieved by increasing by 100 the number of each port used by Keycloak so that instead of listening on the default HTTPS 8443 port, the server will be available at http://localhost:8543/auth:
+
+```
+$ cd $KC_HOME
+$ bin/kc.sh start --https-certificate-file=./tls/mykeycloak+1.pem --https-certificate-key-file=./tls/mykeycloak+1-key.pem --hostname=mykeycloak:8543 --hostname-strict-backchannel=true
+```
+
+Now, perform the same steps to start the third node as follows:
+
+```
+$ cd $KC_HOME
+$ bin/kc.sh start --https-certificate-file=./tls/mykeycloak+1.pem --https-certificate-key-file=./tls/mykeycloak+1-key.pem --hostname=mykeycloak:8643 --hostname-strict-backchannel=true
+```
+
+After executing this last command, you should now have three Keycloak instances running on ports 8443, 8543, and 8643, respectively.
+
+Keycloak runs on top of JGroups and Infinispan, which provide a reliable, high-availability stack for a clustered scenario. When deployed to a cluster, the embedded Infinispan server communication should be secured. You secure this communication either by enabling authentication and encryption or by isolating the network used for cluster communication.
+
+Keycloak provides a cache configuration file with sensible defaults located at $KC_HOME/conf/cache-ispn.xml. The cache configuration is a regular Infinispan configuration file.
+
+By looking at the $KC_HOME/conf/cache-ispn.xml file, you should see the following cache definitions: :
 
 ```xml
 <distributed-cache name="sessions" owners="1"/>
@@ -227,9 +256,7 @@ Bellow are some relevant parameters :
 </distributed-cache>
 ```
 
-Depending on your availability and failover requirements, you might want to increase the number of owners – the nodes where state is replicated – to at least 2 so that state is replicated to 2 nodes in the cluster. By increasing the number of owners, Keycloak can survive up to 1 node failure without losing any state.
-
-To find out more about using multiple nodes, the different caches and an appropriate stack for your environment, see the [Configuring distributed caches](https://www.keycloak.org/server/caching) guide.
+Depending on your availability and failover requirements, you might want to increase the number of owners – the nodes where state is replicated – to at least 2 so that state is replicated to 2 nodes in the cluster. By increasing the number of owners, Keycloak can survive up to 1 node failure without losing any state. To find out more about using multiple nodes, the different caches and an appropriate stack for your environment, see the [Configuring distributed caches](https://www.keycloak.org/server/caching) guide.
 
 ## Configuring a reverse proxy
 
@@ -244,7 +271,7 @@ Regardless of your preference, there is a set of basic requirements that you sho
 
 Some of these requirements are intrinsic to the concept of a reverse proxy and are supported by the different implementations.
 
-For this lab, we are going to use the haproxy.cfg file available at [setup-keycloak/haproxy/haproxy.cfg](./setup-keycloak/haproxy.cfg).
+For this lab, we are going to use the haproxy.cfg file available at [setup-keycloak/haproxy/haproxy.cfg](./setup-keycloak/haproxy/haproxy.cfg).
 
 In the next steps, we will be looking at each of the requirements mentioned herein and how to address them using HAProxy.
 
@@ -310,80 +337,6 @@ cookie KC_ROUTE insert indirect nocache
 With the preceding configuration, HAProxy is going to set a **KC_ROUTE** cookie where its value is the first node that the client made the request to. Subsequent requests from the same client will always be served by the same node.
 
 
-## Putting it all together!
-
-First, we start by building all relevant containers with the parameters explained in the previous sections :
-
-- Navigate to keycloak folder and then run the following command :
-
-```
-docker build -t keycloak-clustered .
-```
-
-- Navigate to keycloak folder and then run the following command :
-
-```
-docker build -t haproxy-reverse-proxy .
-```
-
-Open a terminal and create a Docker network
-
-```
-$ docker network create keycloak-net
-```
-
-Open another terminal and run keycloak-clustered-1 Docker container
-
-```
-$ docker run --rm --name keycloak-clustered-1 -p 8080:8080 \
-  -e KEYCLOAK_ADMIN=admin \
-  -e KEYCLOAK_ADMIN_PASSWORD=admin \
-  -e KC_DB=mysql \
-  -e KC_DB_URL_HOST=mysql \
-  -e KC_DB_URL_DATABASE=keycloak \
-  -e KC_DB_USERNAME=keycloak \
-  -e KC_DB_PASSWORD=password \
-  -e KC_LOG_LEVEL=INFO,org.infinispan:DEBUG,org.jgroups:DEBUG \
-  -e JGROUPS_DISCOVERY_EXTERNAL_IP=keycloak-clustered-1 \
-  --network keycloak-net \
-  keycloak-clustered:latest start-dev
-```
-
-Open another terminal and run keycloak-clustered-2 Docker container
-
-```
-$ docker run --rm --name keycloak-clustered-2 -p 8081:8080 \
-  -e KEYCLOAK_ADMIN=admin \
-  -e KEYCLOAK_ADMIN_PASSWORD=admin \
-  -e KC_DB=mysql \
-  -e KC_DB_URL_HOST=mysql \
-  -e KC_DB_URL_DATABASE=keycloak \
-  -e KC_DB_USERNAME=keycloak \
-  -e KC_DB_PASSWORD=password \
-  -e KC_LOG_LEVEL=INFO,org.infinispan:DEBUG,org.jgroups:DEBUG \
-  -e JGROUPS_DISCOVERY_EXTERNAL_IP=keycloak-clustered-2 \
-  --network keycloak-net \
-  keycloak-clustered:latest start-dev
-```
-
-Open another terminal and run keycloak-clustered-3 Docker container
-
-```
-$ docker run --rm --name keycloak-clustered-3 -p 8081:8080 \
-  -e KEYCLOAK_ADMIN=admin \
-  -e KEYCLOAK_ADMIN_PASSWORD=admin \
-  -e KC_DB=mysql \
-  -e KC_DB_URL_HOST=mysql \
-  -e KC_DB_URL_DATABASE=keycloak \
-  -e KC_DB_USERNAME=keycloak \
-  -e KC_DB_PASSWORD=password \
-  -e KC_LOG_LEVEL=INFO,org.infinispan:DEBUG,org.jgroups:DEBUG \
-  -e JGROUPS_DISCOVERY_EXTERNAL_IP=keycloak-clustered-3 \
-  --network keycloak-net \
-  keycloak-clustered:latest start-dev
-```
-
-
 ## Testing your environment
 
 ### Testing load balancing and failover
@@ -410,8 +363,3 @@ If everything is set correctly, you should see that, regardless of the node serv
 ## Summary
 
 In this lab, we covered the main steps to configure Keycloak for production. With the information provided herein, you should now be aware of the main steps and configuration to successfully deploy Keycloak for high availability. You learned that when deploying Keycloak in production, you should always use a secure channel using HTTPS, as well as the importance of setting up the hostname provider to configure how Keycloak issues tokens and exposes its endpoints through the OpenID Connect Discovery document. You also learned about the importance of using a production-grade database and its impact on the overall performance and availability of Keycloak, as well as on data consistency and integrity. Lastly, you learned how to configure and run a cluster with multiple Keycloak instances and how to use a reverse proxy to distribute load across these instances.
-
-
-
-
-
