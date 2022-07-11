@@ -26,7 +26,7 @@ To run Keycloak on Docker, simply execute the following command:
 ```
 $ docker run --name keycloak -p 8080:8080  \
     -e KEYCLOAK_ADMIN=admin -e KEYCLOAK_ADMIN_PASSWORD=admin \
-    quay.io/keycloak/keycloak-x \
+    quay.io/keycloak/keycloak:18.0.1 \
     start-dev
 ```
 

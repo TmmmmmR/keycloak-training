@@ -1,43 +1,32 @@
 # Lab 3 : The OpenID Connect playground
 
 In this lab we are going to use the OpenID Connect (OIDC) playground in order to understand and experiment with OIDC in a practical way.
-The playground application does not use any libraries for OIDC, but rather all OIDC requests are crafted by the application itself. One thing to note here is that this application is not implementing OIDC in a secure way, and is ignoring optional parameters in the requests that are important for a production application. There are two reasons for this. Firstly, it is so you can focus on understanding the general concepts of OIDC. Secondly, if you decide to implement your own application libraries for OIDC you should have a very good understanding of the specifications, and it is beyond the scope of this training to cover OIDC in that much detail.
 
 ## Starting the lab
 
-To run the OIDC playground application, open a terminal and run the following commands:
-
-```
-$ cd lab3/oidc-playground
-$ npm install
-$ npm start
-```
-
-To verify the application is running, open http://localhost:8000/ in your browser. The following screenshot shows the OIDC playground application page:
+To verify the application is running, open http://oidc-playground:8000/ in your browser. The following screenshot shows the OIDC playground application page:
 
 ![The OpenID Connect playground application](./images/oidc-app.jpg)
 
 
-In order to be able to use the playground application you need Keycloak running, a realm with a user that you can log in with, and have a client with the following configuration:
+In order to be able to use the playground application you need to creat a realm with a user named "test" and password "test" that you can log in with, and have a client with the following configuration:
 
 - Client ID: oidc-playground
 - Access Type: public
-- Valid Redirect URIs: http://localhost:8000/
-- Web Origins: http://localhost:8000
-
-In the next section, we will start taking a deeper look at OIDC by leveraging the playground application, starting with understanding how applications can discover information about an OpenID Provider.
+- Valid Redirect URIs: http://oidc-playground:8000/
+- Web Origins: http://oidc-playground:8000
 
 ## Understanding the Discovery endpoint
 
 To better understand the OpenID Provider Metadata, open the OIDC playground in your browser. You can see there is already a value filled in for the issuer input.
-The value for the issuer URL that is already filled in is http://localhost:8080/auth/realms/myrealm. Let's break this URL apart and take a look at the parts of the issuer URL:
+The value for the issuer URL that is already filled in is http://localhost:8080/realms/myrealm. Let's break this URL apart and take a look at the parts of the issuer URL:
 
-- **http://localhost:8080/auth**: This is the root URL for Keycloak. In a production system, this would obviously be a real domain name and would use HTTPS (for example, https://auth.mycompany.com/).
+- **http://localhost:8080**: This is the root URL for Keycloak. In a production system, this would obviously be a real domain name and would use HTTPS (for example, https:/.mycompany.com/).
 - **/realms/myrealm**: As Keycloak supports multi-tenancy, this is used to separate each realm in your Keycloak instance.
 
 If you have Keycloak running on a different hostname, port, or have a different realm, you should change the issuer field. Otherwise, you can leave it as is.
 
-Now click on Load OpenID Provider Configuration. When you click on this button, the playground application sends a request to http://localhost:8080/auth/realms/myrealm/.well-known/openid-configuration (assuming you left the issuer URL untouched) and receives a response in the form of the OpenID Provider Metadata for this Keycloak instance. The returned metadata is displayed in the OpenID Provider Configuration section of the playground application.
+Now click on Load OpenID Provider Configuration. When you click on this button, the playground application sends a request to http://localhost:8080/realms/myrealm/.well-known/openid-configuration (assuming you left the issuer URL untouched) and receives a response in the form of the OpenID Provider Metadata for this Keycloak instance. The returned metadata is displayed in the OpenID Provider Configuration section of the playground application.
 
 The following screenshot from the playground application shows an example of the loaded OpenID Provider Metadata:
 
@@ -70,7 +59,7 @@ Now let's take a look at what the authentication request will look like by click
 
 The following screenshot from the playground application shows an example authentication request:
 
-![Authentication request](./images/auth_req.jpg)
+![Authentication request](./images_req.jpg)
 
 This includes setting the **response_type** parameter to **code**, meaning that the application wants to receive an authorization code from Keycloak.
 
@@ -141,16 +130,6 @@ One thing to notice here is that the refresh response also includes a refresh to
 Finally, under **ID Token** you may notice that the token has more or less the same values except the expiration time (exp), the issue time (iat), and the token ID (jti) have changed.
 
 Another benefit of refreshing the token is that your application can update information about the user from Keycloak without having to re-authenticate. We'll now experiment a bit with this.
-
-For the next few sections, you should keep the playground application open. In a new browser window open the Keycloak Admin Console, click on Users and locate the user you used when authenticating to the playground application.
-
-First, let's try to update the user profile.
-
-## Updating the user profile
-
-Change the email, first name, and last name of the user. Then go back to the playground application and click on the **Send Refresh Request** button. You will now notice that the user profile was updated.
-
-Now that you have tried updating the user profile, let's try to add a custom property to the user.
 
 ## Adding a custom property
 Let's take a look at the steps to add a custom property:

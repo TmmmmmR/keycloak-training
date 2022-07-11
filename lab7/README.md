@@ -2,17 +2,34 @@
 
 For this lab we are going to use Openldap as a user provider.
 
-From the current directory of this lab, execute the following docker command to spin up a ready-to-use LDAP server :
+We are going to use docker images for both Keycloak and LDAP service, but first we need to create a docker network so they can communicate together :
 
 ```bash
-docker run --env LDAP_ORGANISATION="The Corporation" --env LDAP_DOMAIN="corp.com" --env LDAP_ADMIN_PASSWORD=<OPENLDAP_ADMIN_PASSWORD> --volume ./data/:/home/data/ -p 389:389 -p 636:636 --name openldap osixia/openldap:1.3.0
+$ docker network create ldap_keycloak
 ```
 
-The project uses a sample [user database](./ldap/conf/ldap_data.ldif) that can be imported as follows:
+Then we start ou keycloak instance by adding the --network switch :
 
 ```bash
-docker exec openldap ldapadd -x -H ldap://localhost -D "cn=admin,dc=corp,dc=com" -w <OPENLDAP_ADMIN_PASSWORD> -f /home/data/ldap_data.ldif
+$ docker run --name keycloak -p 8080:8080  \
+    -e KEYCLOAK_ADMIN=admin -e KEYCLOAK_ADMIN_PASSWORD=admin \
+    --network ldap_keycloak \
+    quay.io/keycloak/keycloak:18.0.1 \
+    start-dev
+```
+
+Open a new terminal tab, and from the current directory of this lab, execute the following docker command to spin up a ready-to-use LDAP server :
+
+```bash
+docker run --env LDAP_ORGANISATION="The Corporation" --env LDAP_DOMAIN="corp.com" --env LDAP_ADMIN_PASSWORD=admin --network ldap_keycloak --mount type=bind,source="$(pwd)"/data,target=/home/data -p 389:389 -p 636:636 --name openldap osixia/openldap:1.3.0
+```
+
+The project uses a sample [user database](./ldap/conf/ldap_data.ldif) that can be imported as follows (from a new terminal tab) :
+
+```bash
+docker exec openldap ldapadd -x -H ldap://localhost -D "cn=admin,dc=corp,dc=com" -w admin -f /home/data/ldap_data.ldif
 ``` 
+
 LDAP view:
 ![ldapview](./images/ldap.jpg)
 
