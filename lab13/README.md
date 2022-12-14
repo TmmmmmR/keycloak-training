@@ -1,7 +1,6 @@
-Lab : Keycloak OPA Config Validation
-----
+# Lab 13 : Keycloak OPA Config Validation
 
-In this lab, you we learn how to validate Keycloak configuration with [Open Policy Agent](https://www.openpolicyagent.org/). This can be interesting if you want to detect insecure Keycloak settings, or check the compliance of your instance against a set of rules.
+In this lab, you will learn how to validate Keycloak configuration with [Open Policy Agent](https://www.openpolicyagent.org/). This can be interesting if you want to detect insecure Keycloak settings, or check the compliance of your instance against a set of rules.
 
 In this lab we use OPA's ["rego" policy definition language](https://www.openpolicyagent.org/docs/latest/policy-language/)
 and the configtest tool to validate a client configuration.
