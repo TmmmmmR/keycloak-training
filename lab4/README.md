@@ -31,7 +31,6 @@ To verify that the application is running, open http://localhost:8000/ in your b
 In order to be able to use the playground application, you need Keycloak to be running, as well as to have a realm named myrealm with a user with the myrole global role and a client with the following configuration:
 
 - Client ID: oauth-playground
-- Access Type: public
 - Valid Redirect URIs: http://localhost:8000/
 - Web Origins: http://localhost:8000
 
@@ -90,7 +89,7 @@ The following screenshot shows the client scope that you should create:
 
 ![Creating a client scope](./images/create_client_scope.jpg)
 
-You can leave the other values as is, then click on **Save**. Now, navigate to the **oauth-playground** client again, then click on **Client Scopes**. From the **Optional Client Scopes** section in **available client scopes**, select **albums** and click on **Add selected**.
+You can leave the other values as is, then click on **Save**. Now, navigate to the **oauth-playground** client again, then click on **Client Scopes**, and then **Add client scope** and select **albums** and click on **Add** as **Optional**.
 
 Now, return to the playground application again, then click on the button labeled **2 – Authorization**. In the scope field, enter **albums**, then click on **Send Authorization Request**. This time, you should be prompted to grant access to view photo albums as shown in the following screenshot:
 
@@ -127,15 +126,14 @@ In Keycloak, there are two different ways to include a client in the audience. I
 
 Let's try to add the audience manually with a protocol mapper. Open the Keycloak admin console and navigate to **Clients**. Create a new client with the **Client ID** value set as **oauth-backend**.
 
-Then, click on Save. After it has been saved, change **Access Type** to **bearer-only**, and click **Save** again.
+Now go back to the client list and open the **oauth-playground** client. Click on **Client scopes**, then click on the first option **myclient-dedicated** > **Configure a new mapper** and choose **Audience**. Fill in the form with the following values:
 
-Now go back to the client list and open the **oauth-playground** client. Click on **Mappers**, then click on **Create**. Fill in the form with the following values:
-
-- **Name**: backend audience
 - **Mapper Type**: Audience
+- **Name**: backend audience
 - **Included Client Audience**: oauth-backend
 - Then, click on **Save**.
-- Go back to the playground application and obtain a new access token. Now **oauth-backend** is included in the **aud** field, and if you again try to invoke the service through the playground application, you will get a successful response.
+
+Go back to the playground application and obtain a new access token. Now **oauth-backend** is included in the **aud** field, and if you again try to invoke the service through the playground application, you will get a successful response.
 
 When looking at the **aud** field of the access token, you may have noticed that account was included. The reason this is included is that by default, a client has a scope on all roles, and by default, a user has a few client roles for the account client that provide the user access to the Keycloak account console. In the next section, we will take a closer look at how roles work.
 
@@ -180,11 +178,11 @@ The **account** client, on the other hand, is included as the token includes rol
 
 You can also see that the token includes all roles granted to the user. By default, all roles for a given user are included in the token. This is for convenience when getting started with Keycloak and you should not include all roles in a production scenario.
 
-Now, let's try to limit the role scope for the **oauth-playground** client to limit what is included in the token. Open the Keycloak admin console and navigate to the **oauth-playground** client. Then, click on the tab labeled Scope. You will notice that it has the **Full Scope Allowed** option turned on. This is the feature that by default includes all roles for a user in the tokens sent to this client.
+Now, let's try to limit the role scope for the **oauth-playground** client to limit what is included in the token. Open the Keycloak admin console and navigate to the **oauth-playground** client. Then, click on the tab labeled **Client scopes**, then click on **myclient-dedicated** > **Scope**. You will notice that it has the **Full Scope Allowed** option turned on. This is the feature that by default includes all roles for a user in the tokens sent to this client.
 
 Turn off **Full Scope Allowed**, then return to the playground application and obtain a new access token. In the new access token, you will notice that there are no longer any roles in the token and the **aud** claim now only includes the **oauth-playground** client. If you now try to invoke the service with this token, you will get an access denied message. This is because the service only permits requests that include the **myrole** role.
 
-Go back to the Keycloak admin console and again open the scope tab for the **oauth-playground** client. Under **Realm Roles**, select the **myrole** role and click on **Add selected**. Return to the playground application and obtain a new access token, and you will now see that the **myrole** role is included in the **realm_access** claim, as shown in the following access token snippet:
+Go back to the Keycloak admin console and again open the **oauth-playground** client configuration sectoion, Click on **Client scopes**, and then click on the first option **myclient-dedicated** > **Scope**. Click on **Assign role**, select the **myrole** role and click on **Assign**. Return to the playground application and obtain a new access token, and you will now see that the **myrole** role is included in the **realm_access** claim, as shown in the following access token snippet:
 
 ```json
 {
@@ -199,27 +197,34 @@ Go back to the Keycloak admin console and again open the scope tab for the **oau
 
 It is also possible to add scope through a client scope that is attached to a client. This may be a bit confusing as the term scope is somewhat overused within Keycloak. The following list tries to clarify this potential confusion:
 
-- **A client has a scope on roles**: This is configured through the Scope tab for a client.
+- **A client has a scope on roles**: This is configured inside the client configuration, under the **Client scopes** scope, first option **myclient-dedicated** > **Scope**.
 - **A client can access one or more client scopes**: This is configured through the **Client Scopes** tab for a client.
 - **A client scope can also have a scope on roles**: When a client has access to a client scope that in turn has a scope on roles, the client has a scope on the roles that the client scope has.
 
 As this may still be a bit confusing, let's experiment a bit with this in practice by leveraging the playground application.
-Before continuing, you should first remove the scope that the **oauth-playground** client has on the **myrole** role. To do this, return to the Keycloak admin console, navigate to the **oauth-playground** client, and click on the **Scope** tab. Then, select the **myrole** role from the **Assigned Roles** section and click on **Remove selected**.
+
+Before continuing, you should first remove the scope that the **oauth-playground** client has on the **myrole** role. To do this, return to the Keycloak admin console, navigate to the **oauth-playground** client, and click **Client scopes**, then click on **myclient-dedicated**, select the **Scope** tab, choose **myrole** and then click on **Unassign**.
 
 Now the tokens sent to the **oauth-playground** client no longer include the **myrole** role, which is exactly what we want as we will now add this through a client scope instead of directly to the client.
 
-Open the Keycloak admin console and go to **Client Scopes**. Click on **Create** to create a new client scope. For the name, enter **myrole** and leave everything else as is, then click on **Save**. Now, select the tab labeled Scope. This is where you control what roles are included in the token when this client scope is included. Select the **myrole** role from **Available Roles** and click on **Add selected**.
-You have now created a client scope that has a scope on the **myrole** role. Next, let's add this client scope as an optional client scope to the **oauth-playground** client. Navigate to the **oauth-playground** client and click on **Client Scopes**. In the **Optional Client Scopes** section, select **myrole** and click on **Add selected**.
+Open the Keycloak admin console and go to **Client Scopes**. Click on **Create client scope** to create a new client scope. For the name, enter **myrole** and leave everything else as is, then click on **Save**.
+
+Now, select the tab labeled Scope. This is where you control what roles are included in the token when this client scope is included. Select the **myrole** role from the list and click on **Assign role**.
+
+You have now created a client scope that has a scope on the **myrole** role.
+
+Next, let's add this client scope as an optional client scope to the **oauth-playground** client. Navigate to the **oauth-playground** client and click on the **Client Scopes** tab, and then **Add client scope**, select **myrole** and click on **Add** as **Optional**.
 
 As you added the **myrole** client scope as an optional client scope, it means the **myrole** role is only included in the token if the **oauth-playground** client explicitly requests the **myrole** scope.
 
-Return to the playground application and obtain a new access token. You will see that the **myrole** role is not yet included in the realm_access claim. In fact, the realm_access claim should not be included at all since the client does not at this point have a scope on any global roles. In the Scope field, set the value to **myrole**, and click on **Send Authorization Request** to obtain a new access token that includes this scope. This results in the playground application requesting the **myrole** scope, which in turn will add the **myrole** role to the token.
+Return to the playground application and obtain a new access token. You will see that the **myrole** role is not yet included in the **realm_access** claim. In fact, the **realm_access** claim should not be included at all since the client does not at this point have a scope on any global roles. In the Scope field, set the value to **myrole**, and click on **Send Authorization Request** to obtain a new access token that includes this scope. This results in the playground application requesting the **myrole** scope, which in turn will add the **myrole** role to the token.
 
 In the next section, we will take a look at how scopes on their own can be leveraged to limit the access granted by a token.
 
 ### Using the scope to limit token access
 
 Let's imagine that we have a photo album service that provides access to view albums, create albums, and delete albums. We'll also pretend that the playground application offers functionality to view and manage photo albums.
+
 Start by creating the following three client scopes through the Keycloak admin console:
 
 - albums:view
@@ -229,15 +234,15 @@ Start by creating the following three client scopes through the Keycloak admin c
 We have already covered how to create client scopes previously, but in summary, the steps you need to create a client scope are as follows:
 
 1. Open **Client Scopes** in the Keycloak admin console.
-2. Click on the button labeled **Create**.
+2. Click on the button labeled **Create client scope**.
 3. Enter the name from the preceding list, and enter some value for the **Consent Screen Text** field that describes to a user what permissions are given (for example, View photo albums).
 4. Click on the button labeled **Save**.
 
-After you have created the three client scopes, navigate to the **oauth-playground** client and click on **Client Scopes**. In the **Default Client Scopes** section, select albums:view and click on **Add selected**. Then, in the **Optional Client Scopes** section, select **albums:create** and **albums:delete**, then click on **Add selected**.
+After you have created the three client scopes, navigate to the **oauth-playground** client and click on **Client Scopes**. Click on **Add client scope**, select **albums:view** and click on **Add** as **Default**. Then, click again on **Add client scope**, select **albums:create** and **albums:delete**, then click on click on **Add** as **Optional** this time.
 
 We added the scope to view permissions as a default scope as we're assuming that the playground application always requires viewing albums. On the other hand, we set the ability to create and delete albums as optional. This is sometimes referred to as incremental authorization, where the application requests additional permissions only when the user starts using a part of an application that requires the additional permissions. This approach makes it a lot more intuitive to the user why the application is requesting the permissions.
 
-Before continuing, make sure the **oauth-playground** client requires consent by selecting the **Settings** tab and then checking that **Consent Required** is turned on.
+Before continuing, make sure the **oauth-playground** client requires consent by checking that **Consent Required** is turned on under the **Login settings**.
 
 Now, return to the playground application and remove any value in the Scope field before clicking on the **Send Authorization Request** button. Keycloak should now ask you to grant the **oauth-playground** application access to view photo albums, as shown in the following screenshot:
 
@@ -268,7 +273,7 @@ Keep this terminal open, then open the playground application and obtain a new a
 Now, you can invoke the token introspection endpoint by running the following command in the same terminal:
 
 ```
-$ curl --data "client_id=oauth-backend&client_secret=$SECRET&token=$TOKEN" http://localhost:8180/auth/realms/myrealm/protocol/openid-connect/token/introspect
+$ curl --data "client_id=oauth-backend&client_secret=$SECRET&token=$TOKEN" http://localhost:8080/realms/myrealm/protocol/openid-connect/token/introspect
 ```
 
 The endpoint will return a JSON document with the state of the token, and associated information for the token, as shown in the following screenshot:
@@ -288,7 +293,6 @@ All Keycloak client libraries, which are referred to as application adapters by 
 You should now have a good idea of how a service can verify a token either by using the token introspection endpoint or by directly verifying the token if it is a JWT.
 
 ## Summary
-In this lab, you experienced first hand how to obtain access tokens using the OAuth 2.0 Authorization Code grant type. You learned how an admin can grant access to internal applications on behalf of a user, and how users themselves can grant access to third-party applications. You learned about various different techniques on how you can limit the access provided by a specific access token. Finally, you learned how a service can directly read and understand the contents of an access token issued by Keycloak, as it is using JWT-based tokens. You also learned how the token introspection endpoint can be leveraged to validate and discover information about an access token in a more standard and portable way.
 
 You should now have a basic understanding of OAuth 2.0 and how it can be used to secure your own applications. We will build on this knowledge later in the up-coming lab to get you ready to start securing all your applications with Keycloak.
 

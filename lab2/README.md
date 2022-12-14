@@ -54,13 +54,19 @@ Fill in the form with the following values:
 
 - Client ID: myclient
 - Client Protocol: openid-connect
-- Root URL: http://localhost:8000
 
 The following screen shows the **Add Client** form with the values you need to fill in:
 
 ![Creating the client in the admin console](./images/create_client.jpg)
 
-Once you have filled in the form, click on Save. After you click Save, you will see the full configuration for the client. There are two configuration options that are particularly interesting at this point:
+Once you have filled in the form, click on Next. You will get a second form :
+
+![Creating the client in the admin console](./images/create_client_2.jpg)
+
+You can keep the default settings, and then click on Save, you will see the full configuration for the client.
+
+
+There are two configuration options that are particularly interesting at this point:
 
 - **Valid Redirect URIs** : This value is very important in an OpenID Connect authorization code flow when a client-side application is used. A client-side application is not able to have any credentials as these would be visible to end users of the application. To prevent any malicious applications from being able to masquerade as the real application, the valid redirect URIs instruct Keycloak to only redirect the user to a URL that matches a valid redirect URI. In this case, since the value is set to http://localhost:8000/*, an application hosted on http://attacker.com would not be able to authenticate.
 - **Web Origins** : This option registers the valid web origins for the application for **Cross-Origin Resource Sharing (CORS)** requests. To obtain tokens from Keycloak, the frontend application has to send an AJAX request to Keycloak, and browsers do not permit an AJAX request from one web origin to another, unless **CORS** is used
@@ -122,15 +128,19 @@ resource_access: This contains a list of client roles.
 
 Currently, the information within the tokens are the default fields available in Keycloak. If you want to add additional information, Keycloak is very flexible in allowing you to customize the contents within the tokens.
 
-Let's give this a go by adding a picture for the user. Leave the tab with the frontend open, and then open a new tab with the Keycloak admin console. In the menu on the left-hand side, click on Users, then click on View all users, and select the user you created previously. Now let's add a custom attribute to the user. Click on Attributes. In the table, there will be two empty input fields at the bottom. In the Key column. set the value to picture, and in the Value column, set the value to the URL to a profile picture. Then, click on Add:
+Let's give this a go by adding a picture for the user. Leave the tab with the frontend open, and then open a new tab with the Keycloak admin console. In the menu on the left-hand side, click on Users, then select the user you created previously. Now let's add a custom attribute to the user.
+
+Click on Attributes. In the table, there will be two empty input fields at the bottom. In the Key column. set the value to picture, and in the Value column, set the value to the URL to a profile picture. Then, click on Add:
 
 ![Adding a custom attribute to a user](./images/custom_attr.jpg)
+
+You can use the following app to generat a test URL to a random avatar : https://vinicius73.github.io/gravatar-url-generator/
 
 Now, go back to the tab where you have the frontend open. To display the profile picture, you can click on the Refresh button. When you click on this button, the tokens will be refreshed, and the new ID token will now contain the picture attribute you just added, which allows the application to display a profile picture for the user.
 
 Next, you will learn how to securely invoke the backend from the frontend.
 
-##Securely invoking the backend REST API
+## Securely invoking the backend REST API
 
 Now, open http://localhost:3000/ and click on the **Public endpoint** link. You will see a message saying **Public message!**. The public endpoint is not secured by Keycloak, and can be invoked without an access token.
 
@@ -140,7 +150,7 @@ Let's now try to invoke the secured endpoint from the frontend. Open http://loca
 
 When you click **Invoke Service**, the frontend sends an AJAX request to the backend service, including the access token in the request, which allows the backend to verify that the invocation is done on behalf of a user who has the required role to access the endpoint.
 
-### Summary
+## Summary
 In this lab, you learned how to secure your first application, consisting of a frontend web application and a backend REST API with Keycloak. You also gained a basic understanding of how Keycloak leverages OpenID Connect to make this all happen in a standard and secure way. Together with what you learned in the first lab of the training, you now have a solid foundation to start learning more about Keycloak.
 
 In the next labs, we will dive deeper into securing applications with Keycloak, giving you a better understanding of how it all works.

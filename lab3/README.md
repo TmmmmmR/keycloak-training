@@ -4,7 +4,7 @@ In this lab we are going to use the OpenID Connect (OIDC) playground in order to
 
 ## Starting the lab
 
-To verify the application is running, open http://oidc-playground:8000/ in your browser. The following screenshot shows the OIDC playground application page:
+To verify the application is running, open http://localhost:8000/ in your browser. The following screenshot shows the OIDC playground application page:
 
 ![The OpenID Connect playground application](./images/oidc-app.jpg)
 
@@ -12,16 +12,15 @@ To verify the application is running, open http://oidc-playground:8000/ in your 
 In order to be able to use the playground application you need to creat a realm with a user named "test" and password "test" that you can log in with, and have a client with the following configuration:
 
 - Client ID: oidc-playground
-- Access Type: public
-- Valid Redirect URIs: http://oidc-playground:8000/
-- Web Origins: http://oidc-playground:8000
+- Valid Redirect URIs: http://localhost:8000/
+- Web Origins: http://localhost:8000
 
 ## Understanding the Discovery endpoint
 
 To better understand the OpenID Provider Metadata, open the OIDC playground in your browser. You can see there is already a value filled in for the issuer input.
 The value for the issuer URL that is already filled in is http://localhost:8080/realms/myrealm. Let's break this URL apart and take a look at the parts of the issuer URL:
 
-- **http://localhost:8080**: This is the root URL for Keycloak. In a production system, this would obviously be a real domain name and would use HTTPS (for example, https:/.mycompany.com/).
+- **http://localhost:8080**: This is the root URL for Keycloak. In a production system, this would obviously be a real domain name and would use HTTPS (for example, https:/login.mycompany.com/).
 - **/realms/myrealm**: As Keycloak supports multi-tenancy, this is used to separate each realm in your Keycloak instance.
 
 If you have Keycloak running on a different hostname, port, or have a different realm, you should change the issuer field. Otherwise, you can leave it as is.
@@ -42,9 +41,11 @@ In the following list, we'll take a look at what some of these values mean:
 - **response_types_supported**: The list of supported response types
 
 With all of this metadata, the Relying Party can make intelligent decisions about how to use the OpenID Provider, including what endpoints to send requests to and what grant types and response types it can use.
+
 If you took an extra good look at the metadata, you may have noticed that Keycloak supports the **authorization_code** grant type and the **code** and **token** response types. We'll use this grant type and these response types to authenticate the user in our playground application in the next section.
 
 ## Authenticating a user
+
 Let's now see the OIDC flow in action by using to the OIDC playground application. As you already loaded the OpenID Provider Metadata in the previous section, the playground application already knows where to send the authentication request. To send an authentication request, click on the button labelled **2 - Authentication**.
 
 The form that is displayed has the following values that you should fill in:
@@ -136,13 +137,12 @@ Let's take a look at the steps to add a custom property:
 
 1. Going back to the Keycloak Admin Console window, which should still have the user open, click on **Attributes**.
 2. In the table that is displayed, set the key to **myattribute** and the value to **myvalue**, then click on **Add**. You have now added a custom attribute to the user, but this is still not available to the application.
-3. We will now create what is called a **client scope**. A client scope allows creating re-usable groups of claims that are added to tokens issued to a client. In the menu on the left-hand side, click on **Client Scopes**, then click on **Create**. For the name in the form, enter **myclaim**. Leave everything else as-is and click **Save**.
-4. Now we'll add the custom attribute to the client scope by creating a mapper. Click on **Mappers**, then click on **Create**.
+3. We will now create what is called a **client scope**. A client scope allows creating re-usable groups of claims that are added to tokens issued to a client. In the menu on the left-hand side, click on **Client Scopes**, then click on **Create client scope**. For the name in the form, enter **myclaim**. Leave everything else as-is and click **Save**.
+4. Now we'll add the custom attribute to the client scope by creating a mapper. Click on **Mappers**, then click on **Configure a new mapper** and choose **User Attribute**.
 
 Fill in the form with the following values:
 
 - Name: myattribute
-- Mapper Type: User Attribute
 - User Attribute: myattribute
 - Token Claim Name: myattribute
 - Claim JSON Type: String
@@ -204,7 +204,8 @@ The following screenshot from the playground application shows an example *UserI
 
 Just as you can configure what information Keycloak returns in the ID token through client scopes and protocol mappers, you can also configure what information is returned in the UserInfo endpoint. Further, you can control what information is returned to the client that is invoking the UserInfo endpoint, and not the client that obtained the access token. This means that if a single access token is sent to two separate resource servers, they may see different information in the UserInfo endpoint for the same access token.
 
-Let's try to add some custom information to the UserInfo endpoint. This time, instead of using a client scope, we'll add a protocol mapper directly to the client. Open the Keycloak Admin Console, then under clients locate the oidc-playground client. Click on **Mappers**, then click on **Create**, and fill in the form with the following values:
+Let's try to add some custom information to the UserInfo endpoint. This time, instead of using a client scope, we'll add a protocol mapper directly to the client. Open the Keycloak Admin Console, then under clients locate the oidc-playground client. Click on **Client Scope** > **Dedicated scopes** > **Configure new mapper** and choose 
+**Hardcoded claim**, and fill in the form with the following values:
 
 - **Name**: myotherclaim
 - **Mapper Type**: Hardcoded claim
@@ -223,6 +224,8 @@ In the scope field, remove openid. Then click on **Generate Authentication Reque
 Now click on **3 – Token**, then on Send Token Request. You will notice now that in the **Token Response** there is no **id_token** value, which is why there is no ID token displayed in the **ID Token** section.
 
 Now, if you go to **5 – UserInfo** and click on the **Send UserInfo Request** button you will also notice that the **UserInfo Request** fails.
+
+**Tips :** The list of standard Claims are definded under the following page : https://openid.net/specs/openid-connect-core-1_0.html#StandardClaims. So make sure you are compliant to the Open ID connect naming convention when adding new claims that are not included by default by Keycloak.
 
 ## Summary
 In this lab, you experienced first-hand the interactions in an OIDC authentication flow. You learned how the application prepares an authentication request and then redirects the user-agent to the Keycloak authorization endpoint for authentication. Then you learned how the application obtains an authorization code, which it exchanges for an ID token. By inspecting the ID token, you then learned how an application can find out information about the authenticated users. You also learned how to leverage client scopes and protocol mappers in Keycloak to add additional information about users.

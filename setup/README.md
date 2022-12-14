@@ -1,7 +1,5 @@
 # Setup : Installing and running Keycloak
 
-In this setup guideline, you will quickly learn how to install and run Keycloak.
-
 Keycloak provides a few options on how it can be installed, including the following:
 
 - Running as a container on Docker
@@ -19,14 +17,12 @@ In the next section, we will look at how you can run Keycloak as a container on 
 
 ## Running Keycloak on Docker
 
-With Docker, it is very easy to run Keycloak as you don't need to install a Java virtual machine yourself, nor do you have to download and extract the Keycloak distribution.
-
 To run Keycloak on Docker, simply execute the following command:
 
 ```
 $ docker run --name keycloak -p 8080:8080  \
     -e KEYCLOAK_ADMIN=admin -e KEYCLOAK_ADMIN_PASSWORD=admin \
-    quay.io/keycloak/keycloak:18.0.1 \
+    quay.io/keycloak/keycloak:20.0.1 \
     start-dev
 ```
 
