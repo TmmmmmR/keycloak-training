@@ -38,6 +38,14 @@ After a few seconds, you will see a message along the lines of the following, me
 
 You can verify that Keycloak is running by opening http://localhost:8080.
 
+You can also define the following alias to use the [Admin CLI](https://www.keycloak.org/docs/latest/server_admin/index.html#admin-cli) :
+
+```
+$ mkdir -p $(echo $HOME)/.acme/.keycloak
+$ alias kcadm="docker run --net=host -i --user=1000:1000 --rm -v $(echo $HOME)/.acme/.keycloak:/opt/keycloak/.keycloak:z --entrypoint /opt/keycloak/bin/kcadm.sh quay.io/keycloak/keycloak:19.0.1"
+
+```
+
 Congratulations! You now have Keycloak running as a Docker container and can get started with trying Keycloak out by first discovering the Keycloak admin and account consoles.
 
 
@@ -122,5 +130,6 @@ Or, on Windows, execute the following command:
 After a few seconds, you will see a message that confirms that Keycloak has started successfully
 
 You can verify that Keycloak is running by opening http://localhost:8080.
+
 
 Congratulations! You now have Keycloak running on your workstation and can get started with trying Keycloak out by first discovering the Keycloak admin and account consoles. See you in the next lab !
