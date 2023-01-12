@@ -25,6 +25,7 @@ $ docker run --name keycloak -p 8080:8080  \
     quay.io/keycloak/keycloak:20.0.1 \
     start-dev
 ```
+Note that $(pwd) is only supported on Linux and MacOS - on Windows you will need to replace this with the full current working directory (ex: C:\your\working\directory\).
 
 As expected, the container will run in development mode.
 
